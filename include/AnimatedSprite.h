@@ -5,41 +5,44 @@
 
 class AnimatedSprite : public sf::Transformable, public sf::Drawable {
 public:
-	AnimatedSprite(sf::Texture& texture, sf::Vector2u frame_count, sf::Time animation_speed);
+    AnimatedSprite();
+	AnimatedSprite(sf::Texture& texture, std::size_t frame_count, sf::Time animation_speed);
 
     void update(const sf::Time& delta_time);
 
-    bool setTexture(sf::Texture& texture, sf::Vector2u frame_count);
-    const sf::Texture* getTexture() const noexcept;
-    const sf::Vector2u& getFrameCount() const noexcept;
+    void setTexture(sf::Texture& texture, std::size_t frame_count);
+    const sf::Texture* getTexture() const;
+    std::size_t getFrameCount() const;
 
     void setAnimationSpeed(const sf::Time& speed);
-    const sf::Time& getAnimationSpeed() const noexcept;
+    const sf::Time& getAnimationSpeed() const;
 
     sf::FloatRect getLocalBounds() const;
     sf::FloatRect getGlobalBounds() const;
+
+    void pause();
+    void resume();
+
+    bool isPaused() const;
 
 	void resetAnimation();
 
 private:
 	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override;
 
-    void updateVertex() const;
-    void updateTexcoords() const;
+    void updateVertex();
+    void updateTexcoords();
 
-    mutable bool m_texcoords_need_update;
-    mutable bool m_vertex_need_update;
-
-    sf::Vector2u m_frame_count;
+    std::size_t m_frame_count;
     std::size_t m_frame_counter;
 
-    sf::Time m_animation_time;
+    sf::Time m_time;
     sf::Time m_animation_speed;
 
     sf::Texture* m_texture;
-    mutable sf::FloatRect m_sprite_rect;
+    sf::FloatRect m_sprite_rect;
 
-	mutable sf::VertexArray m_vertex_array;
+    sf::VertexArray m_vertex_array;
 };
 
 #endif // !ANIMATED_SPRITE_H

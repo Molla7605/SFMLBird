@@ -2,8 +2,11 @@
 #define MAIN_HEADER_H
 
 #include <iostream>
-#include <unordered_map>
-#include <span>
+#include <format>
+#include <deque>
+#include <algorithm>
+#include <cmath>
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 
 #endif // !MAIN_HEADER_H

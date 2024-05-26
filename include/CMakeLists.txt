@@ -2,4 +2,8 @@ set(PROGRAM_HEADER
         ${PROGRAM_HEADER_PATH}/Bird.h
         ${PROGRAM_HEADER_PATH}/MainHeader.h
         ${PROGRAM_HEADER_PATH}/AnimatedSprite.h
+        ${PROGRAM_HEADER_PATH}/Background.h
+        ${PROGRAM_HEADER_PATH}/Game.h
+        ${PROGRAM_HEADER_PATH}/Wall.h
+        ${PROGRAM_HEADER_PATH}/ResourcePath.h
 )

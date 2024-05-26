@@ -1,32 +1,38 @@
 #include "AnimatedSprite.h"
 
-AnimatedSprite::AnimatedSprite(sf::Texture &texture, sf::Vector2u frame_count, sf::Time animation_speed) :
+AnimatedSprite::AnimatedSprite() :
+        m_animation_speed(),
+        m_time(),
+        m_frame_counter(0),
+        m_frame_count(),
+        m_texture(nullptr),
+        m_vertex_array(sf::PrimitiveType::Triangles, 6) {}
+
+AnimatedSprite::AnimatedSprite(sf::Texture &texture, std::size_t frame_count, sf::Time animation_speed) :
         m_animation_speed(animation_speed),
-        m_vertex_need_update(true),
-        m_texcoords_need_update(true),
-        m_animation_time(),
+        m_time(),
         m_frame_counter(0),
         m_frame_count(frame_count),
         m_texture(&texture),
         m_vertex_array(sf::PrimitiveType::Triangles, 6) {}
 
 void AnimatedSprite::update(const sf::Time& delta_time) {
-    m_animation_time += delta_time;
-    if (m_animation_time < m_animation_speed) return;
+    m_time += delta_time;
 
-    m_animation_time -= m_animation_speed;
+    if (m_time < m_animation_speed) return;
 
-    m_frame_counter++;
-    if (m_frame_counter >= m_frame_count.x) m_frame_counter = 0;
+    float skipped_frame = std::floor(m_time.asSeconds() / m_animation_speed.asSeconds());
 
-    m_texcoords_need_update = true;
+    m_time -= sf::seconds(m_animation_speed.asSeconds() * skipped_frame);
+    m_frame_counter += static_cast<std::size_t>(skipped_frame);
+
+    if (m_frame_counter >= m_frame_count) m_frame_counter -= m_frame_count;
+    updateTexcoords();
 }
 
-bool AnimatedSprite::setTexture(sf::Texture& texture, sf::Vector2u frame_count) {
-    //만약 텍스쳐의 주소가 같거나 nullptr를 받은 경우 텍스쳐를 적용하지 않음
-    if (m_texture == &texture || m_texture == nullptr) return false;
-    //정점 업데이트 트리거 활성화 (새 텍스쳐의 크기에 맞게 정점을 바꿔야 하기 때문)
-    m_vertex_need_update = true;
+void AnimatedSprite::setTexture(sf::Texture& texture, std::size_t frame_count) {
+    //만약 텍스쳐의 주소가 같은 경우 텍스쳐를 적용하지 않음
+    if (m_texture == &texture) return;
 
     //값 업데이트
     m_texture = &texture;
@@ -35,14 +41,18 @@ bool AnimatedSprite::setTexture(sf::Texture& texture, sf::Vector2u frame_count) 
     //새로운 스프라이트가 들어왔기 때문에 에니메이션을 초기화 함
     resetAnimation();
 
-    return true;
+    //정점 업데이트
+    updateVertex();
+
+    //texcoords 업데이트
+    updateTexcoords();
 }
 
-const sf::Texture* AnimatedSprite::getTexture() const noexcept {
+const sf::Texture* AnimatedSprite::getTexture() const {
     return m_texture;
 }
 
-const sf::Vector2u& AnimatedSprite::getFrameCount() const noexcept {
+std::size_t AnimatedSprite::getFrameCount() const {
     return m_frame_count;
 }
 
@@ -50,33 +60,26 @@ void AnimatedSprite::setAnimationSpeed(const sf::Time& speed) {
     m_animation_speed = speed;
 }
 
-const sf::Time& AnimatedSprite::getAnimationSpeed() const noexcept {
+const sf::Time& AnimatedSprite::getAnimationSpeed() const {
     return m_animation_speed;
 }
 
 sf::FloatRect AnimatedSprite::getLocalBounds() const {
-    //정점 업데이트가 필요한 경우 업데이트
-    if (m_vertex_need_update) updateVertex();
-
     return m_sprite_rect;
 }
 
 sf::FloatRect AnimatedSprite::getGlobalBounds() const {
-    //정점 업데이트가 필요한 경우 업데이트
-    if (m_vertex_need_update) updateVertex();
-
-    return getTransform().transformRect(m_sprite_rect);
+    return getTransform().transformRect(getLocalBounds());
 }
 
 void AnimatedSprite::resetAnimation() {
     //에니메이션을 시작 프레임으로 돌려 두어야 함으로 시간을 0으로 설정하고 카운터를 0으로 설정한다
-    m_animation_time = sf::Time::Zero;
+    m_time = sf::Time::Zero;
     m_frame_counter = 0;
 }
 
 void AnimatedSprite::draw(sf::RenderTarget& target, sf::RenderStates states) const {
-    if (m_vertex_need_update) updateVertex();
-    if (m_texcoords_need_update) updateTexcoords();
+    if (m_texture == nullptr) return;
 
     states.transform *= getTransform();
     states.texture = m_texture;
@@ -84,13 +87,12 @@ void AnimatedSprite::draw(sf::RenderTarget& target, sf::RenderStates states) con
     target.draw(m_vertex_array, states);
 }
 
-void AnimatedSprite::updateVertex() const {
+void AnimatedSprite::updateVertex() {
     //텍스쳐 이미지 가져오기
-    sf::Vector2f texture_size = static_cast<sf::Vector2f>(m_texture->getSize());
+    auto [width, height] = static_cast<sf::Vector2f>(m_texture->getSize());
 
     //스프라이트 범위 구하기, 값 적용
-    float width = texture_size.x / static_cast<float>(m_frame_count.x);
-    float height = texture_size.y / static_cast<float>(m_frame_count.y);
+    width /= static_cast<float>(m_frame_count);
     m_sprite_rect = sf::FloatRect({ 0.0f, 0.0f }, {width, height});
 
     /**
@@ -115,14 +117,11 @@ void AnimatedSprite::updateVertex() const {
     m_vertex_array[3].position = sf::Vector2f(m_sprite_rect.width, 0.0f);
     m_vertex_array[4].position = sf::Vector2f(m_sprite_rect.width, m_sprite_rect.height);
     m_vertex_array[5].position = sf::Vector2f(0.0f, m_sprite_rect.height);
-
-    m_vertex_need_update = false;
 }
 
-void AnimatedSprite::updateTexcoords() const {
+void AnimatedSprite::updateTexcoords() {
     //현재 프래임(지금 보여야 할 이미지)를 기반으로 texcoords의 위치를 구함
-    sf::Vector2f move = m_sprite_rect.getPosition() * static_cast<float>(m_frame_counter);
-
+    float move = m_sprite_rect.getSize().x * static_cast<float>(m_frame_counter);
     /**
      *
      *  길쭉하게 이어진 에니메이션 텍스쳐를 우리가 원하는 부분 만 보이게 자르기 위해 texcoords 값 업데이트
@@ -139,13 +138,14 @@ void AnimatedSprite::updateTexcoords() const {
      *  --------------------------------------
      *
      */
-    m_vertex_array[0].texCoords = sf::Vector2f(0.0f, 0.0f) + move;
-    m_vertex_array[1].texCoords = sf::Vector2f(m_sprite_rect.width, 0.0f) + move;
-    m_vertex_array[2].texCoords = sf::Vector2f(0.0f, m_sprite_rect.height) + move;
+    m_vertex_array[0].texCoords = sf::Vector2f(move, 0.0f);
+    m_vertex_array[1].texCoords = sf::Vector2f(m_sprite_rect.width + move, 0.0f);
+    m_vertex_array[2].texCoords = sf::Vector2f(move, m_sprite_rect.height);
 
-    m_vertex_array[3].texCoords = sf::Vector2f(m_sprite_rect.width, 0.0f) + move;
-    m_vertex_array[4].texCoords = sf::Vector2f(m_sprite_rect.width, m_sprite_rect.height) + move;
-    m_vertex_array[5].texCoords = sf::Vector2f(0.0f, m_sprite_rect.height) + move;
+    m_vertex_array[3].texCoords = sf::Vector2f(m_sprite_rect.width + move, 0.0f);
+    m_vertex_array[4].texCoords = sf::Vector2f(m_sprite_rect.width + move, m_sprite_rect.height);
+    m_vertex_array[5].texCoords = sf::Vector2f(move, m_sprite_rect.height);
 
-    m_texcoords_need_update = false;
 }
+
+
