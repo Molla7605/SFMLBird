@@ -55,7 +55,7 @@ int main() {
 
         window.draw(background);
         window.draw(player);
-        //window.draw(window_rect);
+        window.draw(window_rect);
 
         window.display();
     }

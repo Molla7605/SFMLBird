@@ -33,7 +33,7 @@ private:
     void updateVertex();
     void updateTexcoords();
 
-    std::size_t m_frame_count;
+    std::size_t m_max_frame_count;
     std::size_t m_frame_counter;
 
     sf::Time m_time;

@@ -1,32 +1,44 @@
 #include "AnimatedSprite.h"
 
 AnimatedSprite::AnimatedSprite() :
-        m_animation_speed(),
-        m_time(),
-        m_frame_counter(0),
-        m_frame_count(),
-        m_texture(nullptr),
-        m_vertex_array(sf::PrimitiveType::Triangles, 6) {}
+    m_animation_speed(),
+    m_time(),
+    m_frame_counter(0),
+    m_max_frame_count(),
+    m_texture(nullptr),
+    m_vertex_array(sf::PrimitiveType::Triangles, 6) {}
 
 AnimatedSprite::AnimatedSprite(sf::Texture &texture, std::size_t frame_count, sf::Time animation_speed) :
-        m_animation_speed(animation_speed),
-        m_time(),
-        m_frame_counter(0),
-        m_frame_count(frame_count),
-        m_texture(&texture),
-        m_vertex_array(sf::PrimitiveType::Triangles, 6) {}
+    m_animation_speed(animation_speed),
+    m_time(),
+    m_frame_counter(0),
+    m_max_frame_count(frame_count),
+    m_texture(&texture),
+    m_vertex_array(sf::PrimitiveType::Triangles, 6) {}
 
 void AnimatedSprite::update(const sf::Time& delta_time) {
+    //delta_time을 더해서 경과한 시간 측정
     m_time += delta_time;
 
+    //현재 애니메이션을 업데이트 할 필요가 없는 경우 리턴
     if (m_time < m_animation_speed) return;
 
+    //프로그램이 랙이 걸려 정지 되었을 경우를 대비해 경과한 시간을 기준으로 얼마나 프레임이 스킵되었는지 측정
     float skipped_frame = std::floor(m_time.asSeconds() / m_animation_speed.asSeconds());
 
+    //프레임 시간 만큼 감소 시킴
     m_time -= sf::seconds(m_animation_speed.asSeconds() * skipped_frame);
+    //현재 애니메이션 프레임 구하기
     m_frame_counter += static_cast<std::size_t>(skipped_frame);
 
-    if (m_frame_counter >= m_frame_count) m_frame_counter -= m_frame_count;
+    //최대 프레임을 초과 했으면 카운터가 최대 프레임 수 보다 작아질 때 까지 최대 프레임 수 만큼 카운터 감소
+    /*
+     * 이유는 만약 최대 프레임 수가 3 이라고 가장하면 3번째 프레임을 출력하고 0번 째 프레임으로 되돌아가기 위해
+     * 카운터를 0으로 설정하게 된다. 하지만 위와 같이 프로그램에 랙이 걸려 한번에 많은 프레임이 진행된 경우 한번에
+     * 카운터가 2가 증가하여 5가 되게 된다. 그래서 이를 방지하기 위해 카운터를 최대 프레임 수 보다 작아질 만큼 빼게 되면
+     * 랙 상관 없이 올바른 애니메이션 프레임을 구할 수 있다.
+     */
+    while (m_frame_counter >= m_max_frame_count) m_frame_counter -= m_max_frame_count;
     updateTexcoords();
 }
 
@@ -36,7 +48,7 @@ void AnimatedSprite::setTexture(sf::Texture& texture, std::size_t frame_count) {
 
     //값 업데이트
     m_texture = &texture;
-    m_frame_count = frame_count;
+    m_max_frame_count = frame_count;
 
     //새로운 스프라이트가 들어왔기 때문에 에니메이션을 초기화 함
     resetAnimation();
@@ -53,7 +65,7 @@ const sf::Texture* AnimatedSprite::getTexture() const {
 }
 
 std::size_t AnimatedSprite::getFrameCount() const {
-    return m_frame_count;
+    return m_max_frame_count;
 }
 
 void AnimatedSprite::setAnimationSpeed(const sf::Time& speed) {
@@ -79,11 +91,15 @@ void AnimatedSprite::resetAnimation() {
 }
 
 void AnimatedSprite::draw(sf::RenderTarget& target, sf::RenderStates states) const {
+    //텍스쳐가 존재하지 않으면 리턴
     if (m_texture == nullptr) return;
 
+    //위치 변환 적용
     states.transform *= getTransform();
+    //텍스쳐 지정
     states.texture = m_texture;
 
+    //정점 배열 그리기
     target.draw(m_vertex_array, states);
 }
 
@@ -92,7 +108,7 @@ void AnimatedSprite::updateVertex() {
     auto [width, height] = static_cast<sf::Vector2f>(m_texture->getSize());
 
     //스프라이트 범위 구하기, 값 적용
-    width /= static_cast<float>(m_frame_count);
+    width /= static_cast<float>(m_max_frame_count);
     m_sprite_rect = sf::FloatRect({ 0.0f, 0.0f }, {width, height});
 
     /**
